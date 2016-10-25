@@ -127,7 +127,7 @@ baz(foo);   // T and param - void (&) (int, double)
 ```
 
 
-# Item 2:Understand auto type deduction.
+# Item 2: Understand `auto` type deduction.
 With one exception, `auto` type deduction is template type deduction. In an `auto` variable declaration, `auto` takes the role of `T` in the template, the type specifier for the variable is the `ParamType`.
 
 ```cpp
