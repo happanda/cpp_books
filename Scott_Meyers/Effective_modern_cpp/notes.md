@@ -1,5 +1,7 @@
 # Preface
-This document is my personal attempt to write a  series of notes following **"Effective modern C++"** by *Scott Meyers*. If you came across this document somewhere, I strongly reccomend you to read the original text. Firstly, it is more detailed and contains less errors. Second, there are interesting examples and small wise tips, that I might have missed. Also some items from the book didn't make it here at all.
+This document is my personal attempt to write a  series of notes following **"Effective modern C++"** by *Scott Meyers*. If you came across this document somewhere, I strongly recommend you to read the original text. Firstly, it is more detailed and contains less errors. Second, there are interesting examples and small wise tips, that I might have missed. Also some items from the book didn't make it here at all.
+
+And one more thing: no grammar check has been made yet.
 
 
 # Item 1: Understand template type deduction.
@@ -125,12 +127,61 @@ baz(foo);   // T and param - void (&) (int, double)
 ```
 
 
+# Item 2:Understand auto type deduction.
+With one exception, `auto` type deduction is template type deduction. In an `auto` variable declaration, `auto` takes the role of `T` in the template, the type specifier for the variable is the `ParamType`.
 
+```cpp
+auto        x = 12;
+auto const  cx = x;
+auto const& rx = x;
+```
+These expressions correspond to the following (in terms of type deduction).
 
+```cpp
+template <typename T>
+void foo(T param);
 
+foo(12);
 
+template <typename T>
+void foo(T const param);
 
+foo(x);
 
+template <typename T>
+void foo(T const& param);
+
+foo(x);
+```
+All the rules, 3 cases and everything about array/function types, apply to the auto type deduction.
+
+Now about the special case. In C++11 there are 4 ways to declare a variable:
+
+```cpp
+int x1 = 12;
+int x2(12);
+int x3 = { 12 };
+int x4 { 12 };
+```
+If we are to replace `int` with `auto`, the last 2 expressions will give us a declaration of a `std::initializer_list<int>` type with a single 12 in it. Template function btw cannot deduce `std::initializer_list` type from braced parameters, they just fail to compile.
+
+```cpp
+auto x1 = 12;       // int
+auto x2(12);        // int
+auto x3 = { 12 };   // std::initializer_list<int>
+auto x4 { 12 };     // std::initializer_list<int>
+```
+For C++14 there's one more thing to remember. `auto` can be used as a function's return type. In this case the usual *template type deduction* rules apply, so no initializer lists here. The same is true for `auto` lambda parameters.
+
+```cpp
+auto someFoo()
+{
+    return { 1, 2, 3 };     // compilation error
+}
+
+auto myLambda = [](auto const& value) { ... }
+myLambda({ 1, 2, 3 });      // compilation error
+```
 
 
 
