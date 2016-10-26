@@ -184,13 +184,94 @@ myLambda({ 1, 2, 3 });      // compilation error
 ```
 
 
+# Item 3: Understand `decltype`.
+`decltype` tells you the type of a name or an expression given.
 
+```cpp
+int const x = 12;               // decltype(i)      - int const
+float pow(float val, float p);  // decltype(pow)    - float(float, float)
+                                // decltype(pow(2.0f, 3.0f))    - float
+Widget w;                       // decltype(w)      - Widget
+std::vector<int> v;             // decltype(v)      - std::vector<int>
+```
+`decltype` can be used to write a function, whose return type depends on its parameters types.
+Suppose we write a function that implements indexing operator [] and for instance, logs the access.
 
+```cpp
+// C++11 version
+// it still needs some refinement
+template<typename Container, typename Index>
+auto logAndAccess(Container& c, Index i) -> decltype(c[i])
+{
+    logAndAccess();
+    return c[i];
+}
+```
+`auto` here means nothing but the *trailing return type* syntax. This way, we can use parameters in the return type specification.
+C++11 permits to auto deduce the return type of a single-statement lambdas. As for C++14, it extends this functionality to any functions. So in C++14 this would look like this.
 
+```cpp
+// C++14 version
+// it still needs some refinement
+template<typename Container, typename Index>
+auto logAndAccess(Container& c, Index i)
+{
+    logAndAccess();
+    return c[i];
+}
+```
+Here's a problem: return type `auto` deduction uses template deduction rules, so it will ignore any referenceness to the c[i]. And that would lead to compile errors when a user will do something like `logAndAccess(container, 12) = "Hello";`. So C++14 has a solution, which tells the compiler to apply `decltype` rules instead.
 
+```cpp
+// C++14 version
+// still needs some refinement
+template<typename Container, typename Index>
+decltype(auto) logAndAccess(Container& c, Index i)
+{
+    logAndAccess();
+    return c[i];
+}
+```
+This can be also used to declare variables:
 
+```cpp
+Widget w;
+Widget const& cw = w;
+decltype(auto) cw2 = cw;    // cw2 type is Widget const&
+```
+One thing we can futher improve is working with rvalue containers. Though it may be dangerous to save references of the items in it, we may want to make a copy! `auto itemCopy = logAndAccess(loadStrings(), 12);`
+The key to binding both lvalues and rvalues is using universal reference. Note though than we must use `std::forward` because we're ignorant of the type of the `Containter` whether it's lvalue or rvalue.
 
+```cpp
+// final C++11 version
+template<typename Container, typename Index>
+auto logAndAccess(Container&& c, Index i) -> decltype(std::forward<Container>(c)[i])
+{
+    logAndAccess();
+    return std::forward<Container>(c)[i];
+}
+```
 
+```cpp
+// final C++14 version
+template<typename Container, typename Index>
+decltype(auto) logAndAccess(Container&& c, Index i)
+{
+    logAndAccess();
+    return std::forward<Container>(c)[i];
+}
+```
+
+And here's one final remark on the `decltype`. For lvalue expressions more complicated than names, `decltype` ensures that the type returned is always an lvalue reference. When we have a declared variable `int x = 12;`. Then this one `decltype(x)` gives us `int`, BUT this one `decltype((x))` is `int&`. So be careful when writing function like this:
+
+```cpp
+decltype(auto) foo()
+{
+    int x = 12;
+    // ...
+    return (x);     // you will get a dangling reference here
+}
+```
 
 
 
