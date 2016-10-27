@@ -3,6 +3,9 @@ This document is my personal attempt to write a  series of notes following **"Ef
 
 And one more thing: no grammar check has been made yet.
 
+---
+# CHAPTER 1. Deducing types
+---
 
 # Item 1: Understand template type deduction.
 We have a function
@@ -272,6 +275,84 @@ decltype(auto) foo()
     return (x);     // you will get a dangling reference here
 }
 ```
+
+# Item 4: Know how to view deduced types.
+Maybe I will write this one later.
+
+
+
+---
+# CHAPTER 2. `auto`
+---
+# Item 5: Prefer `auto` to explicit type declarations.
+Consider 3 examples. A simple `int x;` declaration, which doesn't garantee you any initial values of the `x`. A correct way to declare a type of the value pointed by an iterator: `typename std::interator_traits<It>::value_type val = *it;` or even just declaring an iterator like `std::vector<int>::const_iterator = v.cbegin();`. And the last one is declaring a variable of a closure type, which is simply impossible, cause this type is known to the compiler only.
+This cases are easily dealt with `auto`.
+
+```cpp
+auto x;         // compilation error, initializer required
+auto y = 12;    // fine
+
+template <typename It>
+void foo(It it)
+{
+    auto derefIt = * it; // addition space after asterisk is for Atom to parse the Markdown text correctly, sorry
+}
+auto strLess = [](std::shared_ptr<Widget> const& lhs, std::shared_ptr<Widget> const& rhs)
+{
+    return * lhs < * rhs;
+};
+// in C++14 we can even declare lambda parameters auto
+auto strLess14 = [](auto const& lhs, auto const& rhs)
+{
+    return * lhs < * rhs;
+};
+```
+Why is it better to use an `auto`-declared lambda variable instead of a `std::function`? First, when you declare a `std::function`, you must type the correct type cause it's a template.
+
+```cpp
+std::function<std::shared_ptr<Widget> const&, std::shared_ptr<Widget> const&>
+strFunc =
+[](std::shared_ptr<Widget> const& lhs, std::shared_ptr<Widget> const& rhs)
+{
+    return * lhs < * rhs;
+};
+```
+Second, `auto` variable has the exact same type as the closure, while a `std::function` is a more general concept, so it may in some cases allocate additional memory. And finally, calling a function through the `std::function` template is generally slower due to indirect function calls.
+
+Another useful case for `auto` is when working with those dependent integral types like `std::vector<...>::size_type`. Some developers just use `int` or `size_t` like this:
+
+```cpp
+int isz = vctr.size();
+size_t sz = vctr.size();
+```
+Both are incorrect and may lead to port errors. Declaring an `auto` variable on the other hand avoids such problems.
+
+One more point for the `auto` is this code.
+
+```cpp
+std::map<std::string, int> mp;
+for (std::pair<std::string, int> const& p : m) { ... }
+```
+The problem here is that in fact the type of an item inside the container is `std::pair<std::string const, int>`. That little constness of the key causes the code above to make a copy of every item while iterating over the map. We could avoid this if we used `auto`.
+
+```cpp
+for (auto const& p : m) { ... }
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
