@@ -340,17 +340,97 @@ for (auto const& p : m) { ... }
 ```
 
 
+# Item 6: Use the explicitly typed initializer idiom when `auto` deduces undesired types.
+There are some cases where you should use `static_cast`.
 
 
 
+---
+# CHAPTER 3. Moving to Modern C++
+---
+# Item 7: Distinguish between `()` and `{}` when creating objects.
+C++11 introduces the concept of *uniform initialization*, which is brought to life by *braced initialization* syntactic construct.
 
+```cpp
+std::vector<int> v { 1, 3, 5 }; // initialize with values 1, 3, 5
+struct Widget {
+    int x { 0 };    // fine, x's default value is 0
+    int y = 0;      // also fine
+    int z(0);       // error!
+};
+```
+Uncopyable objects may be initialized using braces.
 
+```cpp
+std::atomic<int> ai1 { 12 };    // fine
+std::atomic<int> ai2(12);       // fine
+std::atomic<int> ai3 = 12;      // error!
+```
+Braced initialization prohibits implicit *narrowing conversions* while old-school variants don't.
 
+```cpp
+float x, y, z;
+int s1 { x + y + z };    // error
+int s2(x + y + z);       // fine
+int s3 = x + y + z;      // fine
+```
+Another advantage of braced initializers is it's immunity to *most vexing parse*. This is the effect where compiler interpretes a variable initialization as a function declaration.
 
+```cpp
+Widget w1();    // declares a function returning a Widget
+                // though we wanted just to use a default constructor
+Widget w2{};    // calls constructor with no arguments
+```
+However there's a drawback with braced initializers. It's related to constructor overload rules. When a class has a constructor with `std::initializer_list` argument, the compiler always tries to pick it when it sees braced initialization. It's a such strong desire that an error is generated when there's no way to convert the parameters to the mentioned list object.
 
+```cpp
+struct Widget {
+    Widget(int i, bool b);
+    Widget(int i, double d);
+    Widget(std::initializer_list<long double> il);
+    
+    operator float() const;     // convert to float
+};
 
+Widget w1(10, true);    // parens, calls first ctor
+Widget w2 { 10, true }; // braces, calls std::initializer_list ctor
+                        // (10 and true convert to long double)
+Widget w3(10, 5.0);     // parens, calls second ctor
+Widget w4 { 10, 5.0 };  // braces, calls std::initializer_list ctor
+                        // (10 and 5.0 convert to long double)
+```
+This behaviour can even brake copy-ctors.
 
+```cpp
+Widget w5(w4);      // parens, calls copy ctor
+Widget w6 { w4 };   // braces, calls std::initializer_list ctor
+                    // (w4 converts to float, and float converts to long double)
+```
+Even if you use a move ctor with brace initialization, you will get the same behaviour as in `w6`.
+And here's an example with an error.
 
+```cpp
+struct Widget {
+    Widget(int i, double d);
+    Widget(std::initializer_list<bool> il);
+};
+
+Widget w1 { 10, 5.0 };  // error, requires narrowing conversion
+```
+If the `initializer_list` contained `std::string` objects, than there would be no way to convert and the code would compile, successfully calling the first constructor.
+One subtle detail worth mentioning. Empty braces means no arguments, not empty initializer list, so the following code works like this.
+
+```cpp
+struct Widget {
+    Widget();
+    Widget(std::initializer_list<int> il);
+};
+
+Widget w1{};    // calls default ctor
+Widget w2({});  // calls second ctor with empty list
+Widget w3({});  // calls second ctor with empty list
+```
+This topic is crucial for template class designers. In template code you can't know which classes will be used as a template parameter. So usually it's a "by design" decision to use braces or parens. For example, `std::make_unique` and `std::make_shared` use parentheses internally and document this decision.
 
 
 
