@@ -433,6 +433,49 @@ Widget w3({});  // calls second ctor with empty list
 This topic is crucial for template class designers. In template code you can't know which classes will be used as a template parameter. So usually it's a "by design" decision to use braces or parens. For example, `std::make_unique` and `std::make_shared` use parentheses internally and document this decision.
 
 
+# Item 8: Prefer `nullptr` to `0` and `NULL`.
+Neither `0` nor `NULL` are integral values. `0` is an `int`, `NULL` is allowed to be other integral type than `int`. In certain contexts, compiler considers them as a null pointers though, but in C++11 we have a better option.
+There is a guideline for C++98 programmers to avoid overloading on pointer and integral arguments.
+
+```cpp
+void f(int);
+void f(bool);
+void f(void*);
+f(0);           // calls f(int), not f(void*)
+f(NULL);        // might not compile, but typically calls
+                // f(int). Never calls f(void*)
+```
+If `NULL` is defined as `0L`, than both `int` and `bool` versions are equal conversions, so there's even an ambiguity.
+The actual type of `nullptr` is `std::nullptr_t`, which implicitly converts to all pointer types. So calling `f(nullptr)` gives us the desired invokation of the pointer version.
+Another advantage is more obvious conditional statements, especially when `auto` is involved.
+
+```cpp
+auto res = findWhatIneed(...);
+if (result == 0) { ... }        // not so clear what type findWhatIneed returns
+if (result == nullptr) { ... }  // this one looks much better
+```
+Template functions are another case where `nullptr` is a better choice.
+
+```cpp
+template <typename FuncType, typename PtrType>
+auto doSmthAndCall(FuncType func, PtrType ptr) -> decltype(func(ptr))
+{
+    // some code like locking a mutex
+    return func(ptr);
+}
+// and then we have function like this
+float calculate(std::shared_ptr<Widget> w);
+
+doSmthAndCall(calculate, 0);        // compilation error
+doSmthAndCall(calculate, NULL);     // compilation error
+doSmthAndCall(calculate, nullptr);  // fine
+```
+The problem here is compiler deduces integral type for both `0` and `NULL`, which it can't convert to `std::shared_ptr` as is the case with `nullptr` .
+
+
+
+
+
 
 
 
