@@ -473,8 +473,47 @@ doSmthAndCall(calculate, nullptr);  // fine
 The problem here is compiler deduces integral type for both `0` and `NULL`, which it can't convert to `std::shared_ptr` as is the case with `nullptr` .
 
 
+# Item 9: Prefer `alias` declarations to `typedef`s.
+`typedef`s are a convinient way to type less code. C++11 though offers a *alias declarations*.
 
+```cpp
+// C++98 way
+typedef std::shared_ptr<std::map<std::string, std::string>>  DictPtr;
+// C++11 way
+using DictPtr = std::shared_ptr<std::map<std::string, std::string>>;
+```
+Here are some reasons to prefer the aliases instead of typedefs. First, it's more readable when used for function pointers.
 
+```cpp
+typedef void (*CopyFP)(int, std::string const&);
+
+using CopyFP = void (*)(int, std::string const&);
+```
+A more significant reason is templates. It is not possible to templatise a `typedef` but you can do the following.
+
+```cpp
+template <typename T>
+using MyAllocList = std::list<T, MyAlloc<T>>;
+
+MyAllocList<Widget> list;
+```
+Here's a C++98 way to do this.
+
+```cpp
+template<typename T>
+struct MyAllocList {
+    typedef std::list<T, MyAlloc<T>> type;
+};
+MyAllocList<Widget>::type list;
+```
+If you use this construct inside a template for a member, you will have to precede it with a `typename` word.
+
+```cpp
+template <typename T>
+struct Widget {
+    typename MyAllocList<T>::type list;     // more typing here
+}
+```
 
 
 
