@@ -512,8 +512,87 @@ If you use this construct inside a template for a member, you will have to prece
 template <typename T>
 struct Widget {
     typename MyAllocList<T>::type list;     // more typing here
+};
+```
+
+
+# Item 10: Prefer *scoped enums* to *unscoped enums*.
+C++98 style `enum` declaration polutes the namespace, because the contained names all get to the `enum`'s scope. Hense the name *unscoped enums*.
+
+```cpp
+enum Color { black, white, red };
+auto white = false;                 // error. white already declared
+```
+C++11 offers an alternative - *scoped enums*.
+
+```cpp
+enum class Color { black, white, red };
+auto white = false;                     // okay now
+Color color = Color::black;             // here's how you address those
+color = white;                          // error, types differ
+```
+Scoped enums are much more strongly typed. You can do this with old-style enums:
+
+```cpp
+enum Color { black, white };
+int power(int value, int pow);  // return the power of a value
+
+Color c = black;
+if (c > 0.1) {
+    auto pow = power(c, 2);
+    // ...
 }
 ```
+Writing a simple `enum class` will make the compiler yell at you madly. Although you can use `static_cast`s and this code will be legal with them.
+Another property of the scoped enums is they have the default underlying integral type set to `int`. So you can forward declare them without explicitly writing the type.
+
+```cpp
+enum class Color;                   // fine
+enum class Color : std::uint8_t;    // fine
+enum Color98 : int;                 // fine
+enum Color98e;                      // error
+```
+C++11 enums though are not very convinient when working with tuples.
+
+```cpp
+using UserInfo = std::tuple<std::string, std::string, float>;
+// username, email and raiting
+UserInfo uInfo;
+// ...
+auto val1 = std::get<1>(uInfo);  // not very readable
+
+enum UserInfoFields { uiName, uiEmail, uiRating };
+auto val2 = std::get<uiName>(uInfo);    // much more clear now
+
+enum class UserInfoFieldsC11 { uiName, uiEmail, uiRating };
+auto val2 = std::get<static_cast<std::size_t>(UserInfoFieldsC11::uiName)>(uInfo);
+// is that the code you prefer to write?
+```
+There is a solution though. You can have a function to convert any enum variable to it's underlying type value. But this function must be `constexpr`.
+
+```cpp
+template <typename Enum>
+constexpr typename std::underlying_type<Enum>::type conv(Enum enumval) noexcept
+{
+    return static_cast<typename std::underlying_type<Enum>::type(enumval);
+}
+```
+In C++14 we can get rid of the `::type` by using `underlying_type_t` and replace the return value with `auto`.
+
+```cpp
+auto val = std::get<conv(UserInfoFieldsC11::uiEmail)>(uInfo);
+```
+
+
+
+
+
+
+
+
+
+
+
 
 
 
