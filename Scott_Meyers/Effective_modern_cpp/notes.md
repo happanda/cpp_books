@@ -584,6 +584,48 @@ auto val = std::get<conv(UserInfoFieldsC11::uiEmail)>(uInfo);
 ```
 
 
+# Item 11: Prefer deleted functions to private undefined ones.
+You remember the C++98 way to prevent users of your class to call certain functions like copy constructors and assign operators? Usually they are just defined private.
+Some code (member functions or class friends) still can call those, and you will get linker error in case the functions are not implemented. C++11 offers a better solution - *deleted funcitons*.
+
+```cpp
+struct Widget {
+    Widget(Widget const&) = delete;
+    Widget const& operator=(Widget const&) = delete;
+};
+```
+Deleted functions cause compile time errors if they are called somewhere. For this to work they are usually declared public.
+
+An interesting additional profit is that any funciton may be deleted. For example, you would like to avoid implicit type conversions. `delete` is your friend then.
+
+```cpp
+bool check(int number);
+bool check(char) = delete;      // reject chars
+bool check(bool) = delete;      // reject bools
+bool check(double) = delete;    // reject doubles and floats
+```
+Another useful case is deleting certain template specifications.
+
+```cpp
+template <typename T>
+void doPointerMath(T* ptr);
+
+template <>
+void doPointerMath<void>(void*) = delete;     // no math with void*
+```
+That can be also done inside class. While the old C++98 way doesn't work here, cause you can't give different visibility to template member function and it's instantiation.
+
+```cpp
+struct Widget {
+    template <typename T>
+    void doPointerMath(T* ptr) { ... }
+};
+
+template <>
+void Widget::doPointerMath<void>(void*) = delete;
+```
+
+
 
 
 
