@@ -626,7 +626,43 @@ void Widget::doPointerMath<void>(void*) = delete;
 ```
 
 
+# Item 12: Declare overriding functions override.
+*Overriding* is a mechanism that makes it possible to call derived class function through a base class interface. In order for it to work
+* base class function must be virtual
+* base and derived class functions' signature must be identical. That is function names, paremeter types, constness must be identical, return types and exception specifications must be compatible (?).
+* functions' reference qualifiers must be identical.
+Reference qualifiers are a C++11 feature. They are used to make a function callable for l-value or r-value object only.
 
+```cpp
+struct Widget {
+    void doSmth() &;    // called on l-values only
+    void doSmth() &&;   // called on r-values only
+};
+
+Widget newWidget();
+
+Widget w;
+w.doSmth();             // calls the & version
+newWidget().doSmth();   // calls the && version
+```
+So consider the following example. Many things done wrong here.
+
+```cpp
+struct Foo {
+    virtual void f1() const;
+    virtual void f2(int x);
+    virtual void f4() &;
+    void f4() const;
+};
+
+struct Bar : public Foo {
+    virtual void f1();                  // incorrect constness
+    virtual void f2(unsigned int x);    // wrong argument type
+    virtual void f3() &&;               // wrong referenceness
+    void f4() const;                    // base function isn't virtual
+};
+```
+To avoid such errors just add the `override` keyword at the end of the overriding function signature. It's not necessary to use `virtual`. FYI, `override` is a *contextual keyword*. It means if old code used this word as a variable name, it won't break, cause the word becomes a keyword only at the end of a member function declaration.
 
 
 
