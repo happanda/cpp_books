@@ -665,6 +665,32 @@ struct Bar : public Foo {
 To avoid such errors just add the `override` keyword at the end of the overriding function signature. It's not necessary to use `virtual`. FYI, `override` is a *contextual keyword*. It means if old code used this word as a variable name, it won't break, cause the word becomes a keyword only at the end of a member function declaration.
 
 
+# Item 14: Declare functions `noexcept` if they won’t emit exceptions.
+C++98 exception specifications are deprecated. And instead of them C++11 offers a new way to declare function's exception garantees: the `noexcept` word. It is a part of the function's interface. The client code can query `noexcept` status of a function and use different paths of execution.
+Another advantage of `noexcept` is that compilers can generate better code. This is because if an exception leaves `noexcept` function, the exception specification is violated, and the stack is (only) *possibly* unwound. Compilers need not to keep the stack in unwindable state, or ensure the correct inverse deletion order of the objects inside the function.
+
+In C++98 such functions as `std::vector::push_back` have a strong exception garantee. If the vector needs resizing, it allocates new memory chunk and copies elements one by one. If exception is thrown during copying, the original vector still holds valid data. Replacing the copies with moves in C++11 is only possible when move constructors are declared `noexcept`. If it weren't so, exception thrown while moving the center element of a vector would leave the vector in a wrong state. There's also `std::swap` function, which is declared `noexcept` conditionaly.
+
+```cpp
+template <class T1, class T2>
+struct pair {
+    // ...
+    void swap(pair& p) noexcept(noexcept(swap(first, p.first))
+        && noexcept(swap(second, p.second)));
+    // ...
+};
+```
+One important thing about C++11 is that by default all memory deallocation functions and decstructors are `noexcept`, unless some member's destructor is declared `noexcept(false)`.
+
+For the sake of back-compatibility the compilers usually allow `noexcept` functions to call functions that are not declared `noexcept`. The called functions may be from a C library for example and alas have no exception specification.
+
+
+
+
+
+
+
+
 
 
 
