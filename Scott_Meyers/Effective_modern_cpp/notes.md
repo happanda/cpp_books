@@ -685,7 +685,66 @@ One important thing about C++11 is that by default all memory deallocation funct
 For the sake of back-compatibility the compilers usually allow `noexcept` functions to call functions that are not declared `noexcept`. The called functions may be from a C library for example and alas have no exception specification.
 
 
+# Item 15: Use `constexpr` whenever possible.
+The new keyword `constexpr` specifies that the value of a variable or function can appear in *constant expressions*. That is expressions that can be evaluated during compilation. Such values can be used as non-template arguments, array sizes, enumerator values, alignment specifiers, etc.
+For objects it implies `const` and for functions - `inline`.
 
+`constexpr` functions produce compile-time known values when they are gived compile-time constant expressions as arguments. Otherwise they just work as usual functions.
+
+```cpp
+constexpr int pow(int base, int exp) noexcept
+{
+    return (exp == 0 ? 1 : base * pow(base, exp - 1));
+}
+constexpr auto N = 3;
+std::array<bool, pow(2, N)> switches;   // use with compile-time constants
+
+auto base = readBaseFromSocket();
+auto exp = readExpFromSocket();
+
+auto result = pow(base, exp);       // use with any value as a usual function
+```
+In C++11 `constexpr` functions must be one-liners, consisting of return statement only. `static_assert`s, `typedef`, `using` declarations and directives are also allowed. C++14 removes the requirement of one line. C++11 also doesn't count `void` as a literal type whilst C++14 does.
+
+`constexpr` variables must have literal type (essentially type that can have values known during compilation) and immediately initialized with an expression must be a constant expression. User-defined types can be literal types too because constructors can be `constexpr`. For that to be true, every base class and every non-static member must be initialized, either in the constructors initialization list or by a member brace-or-equal initializer. In addition, every constructor involved must be a `constexpr` constructor and every clause of every brace-or-equal initializer must be a constant expression (C++11). It also may be deleted or defaulted.
+
+```cpp
+struct Point {
+    constexpr Point(double xVal = 0, double yVal = 0) noexcept
+        : x(xVal), y(yVal)
+        { }
+    constexpr double xValue() const noexcept { return x; }
+    constexpr double yValue() const noexcept { return y; }
+    void setX(double newX) noexcept { x = newX; }
+    void setY(double newY) noexcept { y = newY; }
+
+private:
+    double x, y;
+};
+
+constexpr Point p1(3.14, 3.14);     // runs constexpr constructor
+constexpr Point p2(2.1828, 2.1828); // this one too
+
+constexpr Point midpoint(const Point& p1, const Point& p2) noexcept
+{
+    // call constexpr member-functions
+    return { (p1.xValue() + p2.xValue()) / 2, (p1.yValue() + p2.yValue()) / 2 };
+}
+constexpr midP = midpoint(p1, p2);  // calculated during compilation
+```
+When using C++14 we can even declare `setX` and `setY` as `constexpr`, so functions like this are legit.
+
+```cpp
+// C++14 example
+constexpr Point reflect(Point const& p) noexcept
+{
+    Point result;
+    result.setX(-p.xValue());
+    result.setY(-p.yValue());
+    return result;
+}
+```
+It is worth mentioning that `constexpr` variables can be placed in the constant memory region, so they are important for embeded programming.
 
 
 
