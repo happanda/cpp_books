@@ -792,11 +792,58 @@ struct Widget {
 ---
 # CHAPTER 4. Smart pointers
 ---
+Raw memory pointers are fast and easy to use, but they have a number of disadvantages.
+* Declaration doesn't indicate whether it points to a single object or an array.
+* Declaration doesn't tell anything about whether it should be destroyed (whether we own the data).
+* If you find out that you must destroy the data, you can't determine how to do that - by simple `delete` or by calling some special freeing function.
+* If you determine that `delete` is the coorect way, you can't tell if it's braced version `delete[]` should be used.
+* Even when you're sure about the deletion procedure, there's still some work to be done to make sure the pointer is deleted *exactly once* along *every* path of execution.
+* There's no way to tell if the pointer is dangling.
 
+The four smart pointers of C++11 are `std::auto_ptr` (deprecated), `std::unique_ptr`, `std::shared_ptr` and `std::weak_ptr`.
 
+# Item 18: Use `std::unique_ptr` for exclusive-ownership resource management.
+`std::unique_ptr` fulfills the role of *exclusive* resource ownership. A non-null `std::unique_ptr` alway owns what it points to. It's a move-only smart pointer type. The enclosed resource is destroyed uppon pointer destruction (calling `delete` by default).
 
+As for the performance, `unique_ptr` is generally the same size as raw pointers and for most operations including dereferencing it executes the same instructions.
 
+This type of pointer can be used for the Pimpl idiom. Another situation is the factory pattern. `std::unique_ptr` converts easily to `std::shared_ptr`, so whether you need an exclusive or shared ownership of the created object, it's up to you to decide.
 
+```cpp
+template<typename... Ts>
+std::unique_ptr<Widget> createWidget(Ts&&... params) { ... }
+```
+This pointer can be configured to use custom deleter functions.
+
+```cpp
+auto delWidget = [](Widget* widget)
+{
+    // do some work
+    delete widget;
+};
+
+template<typename... Ts>
+std::unique_ptr<Widget, decltype(delWidget)>
+makeWidget(Ts&&... params)
+{
+    std::unique_ptr<Widget, decltype(delWidget)> pW(nullptr, delWidget);
+    if (some condition)   // use Special Widget
+    {
+        pW.reset(new SpecialWidget(std::forward<Ts>(params)...));
+    }
+    else    // use Custom Widget
+    {
+        pW.reset(new CustomWidget(std::forward<Ts>(params)...));
+    }
+    return pW;
+}
+auto newWidget = makeWidget(/* ... */); // no bothering with the special destruction from here
+```
+Lets note that assigning raw pointers to `unique_ptr` is allowed only through `reset` function. That's so because simple assignment would constitute an implicit conversion from a rwa to a smart pointer. Smart pointers prohibit that.
+
+When custom deleters are used with `std::unique_ptr` objects, the size of the smart pointer becomes larger than a raw pointer. The amount of additional memory needed depends on the deleter type. Function pointers usually add one more machine word. For deleters that are funciton objects, the size change depends on how much state is stored in the function object. Stateless function objects (e.g. from lambda expressions with no captures) incur no size penalty, so use them wherever possible.
+
+Note that there is an array version `std::unique_ptr<T[]>`. It has indexing operator, but no dereferencing operators (`*` and `->`). There's about only one situation where this construct should be used - when dealing with C-like API, returning a raw pointer to a heap array.
 
 
 
