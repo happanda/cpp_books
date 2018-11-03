@@ -845,13 +845,77 @@ When custom deleters are used with `std::unique_ptr` objects, the size of the sm
 
 Note that there is an array version `std::unique_ptr<T[]>`. It has indexing operator, but no dereferencing operators (`*` and `->`). There's about only one situation where this construct should be used - when dealing with C-like API, returning a raw pointer to a heap array.
 
+# Item 19. Use `std::shared_ptr for shared-ownership resource management.
+`std::shared_ptr` is a way of binding resource tracking with garbage collection. An object, accessed via `std::shared_ptr`s has its lifetime determined by those pointers. The pointers hold a count of how many of them exist in the runtime. This count is increased when a pointer is copied, decreased when a pointer is destroyed. With the last living pointer destruction, data itself is destructed.
+Move construction, copying doesn't change reference count.
 
+There're performance implications of the refrence counting:
+* `std::shared_ptr` is twice the size of a pointer. It has reference to the data and a reference to a struct with the refrenc count.
+* Reference counter memory must be dynamically allocated. There're implementations of intrusive shared pointers that use object's memory to put the counter in. Also, `std::make_shared` helps avoid cost of dynamic allocation, but it has it's limits in use.  
+* Changes to reference count must be atomic, because of different threads reading/writing. We're takling not about underlying data, but the reference counter itself. 
 
+Shared pointer allows to customize a deleter for the object through a constructor parameter function. It holds it in control block along with reference conter.
+* `std::make_shader` always create the control block.
+* Control block is created when shread ptr is created from unique onership pointer.
+* Shared pointer is creted from a raw pointer.
 
+For certain intricate situation where you want to get correct `std::shared_ptr` to this, i.e. holding a correct control block, you have to inherit your class from `std::enable_shared_from_this`. It the so called _Curriously Recurring Template Pattern_. Such classes do provide a public function to create an instance guarded by shared_ptr, while making ctor's private.
 
+As a side note: don't use `std::shared_ptr` to hold arrays, although you can provide them with custom delete function. Indexing would be a hassle, as well as getting reference to base type, which shared pointers are capable of.
 
+# Item 20. Use `std::weak_ptr` for `std::shared_ptr`-like pointers that can dangle. 
+It's convenient sometimes to have a pointer that works with reference-counted objects, but doesn't affect the counter. It is called `std::weak_ptr`. It works with the same reference counter struct as it's older brother shared_ptr, but weak_ptr can be left with dangling pointer at some time.
+Weak pointers are constructed from shared pointers:
+```cpp
+auto shptr(std::make_shared<Widget>());
+std::weak_ptr<Widget> wptr(shptr);	// weak pointer is created from shared
+shptr = nullptr;			// at this point object is deleted, wptr has dangling pointer
+if (!wptr.expired()) {...}		// but that's not a problem as we can test it
+```
+After the check you'd like to use the object, i.e. get a `std::shared_ptr` out of the weak one. To make this operation atomic, you simply construct the former from the latter:
+```cpp
+std::shared_ptr<Widget> shpRevived = wptr.lock();	// if wptr is expired, shpRevived will contain nullptr
+std::shared_ptr<Widget> shpRecreated(wptr);		// if wptr is expired, exception is thrown
+```
+Simple usage example: factory with cache of produced objects (lets say they're created from a finite pool). Creating an object, the factory gives away a shared pointer, saving the weak one for faster access and also for easy check when it's necessary to clear the cached value.
+Another example is graph-like structures, where we want to avoid circular shared pointer dependencies (and hence memory leaks). Back-links to parent objects could be implemented as weak pointers in this case: it's safer than raw pointer.
+As a matter of performance, `std::weak_ptr`s have the same memory print as `std::shared_ptr`s as well as same amount of atomic operations done (they operate their own reference count).
 
+# Item 21. Prefer `std::make_unique` and `std::make_shared` to direct use of new.
+Functions `std::make_unique, std::make_shared and std::allocate_shared` are useful companions in creation of smart pointer types (the last one is same as make_shared, but provides an allocator argument). These functions make a perfect-forwarding of their arguments to appropriate contructors, and return a smart pointer to newly created object.
+Reasons to use make functions.
+* Less type writing:
+```cpp
+auto spw1(std::make_shared<Widget>());		// with make func
+std::shared_ptr<Widget> spw2(new Widget);	// without make func
+```
+* Exception safety.
+```cpp
+void processWidget(std::shared_ptr<Widget> shpw, int priority);
 
+int computePriority();
+
+processWidget(std::shared_ptr<Widget>(new Widget), computePriority());	// potential leak at new
+processWidget(std::make_shared<Widget>(), computePriority());		// no mentioned leak
+```
+Lets take aside the fact that using funcions' return value as another function's argument directly is often a bad way of doing things. Due to unidentified order of arguments computation, the following might take place: operator new is called with Widget object being constructed, next computePriority is called, which throws exception. stack is unwinded, but the created Widget isn't linked to anywhere, so this memory block is lost. In the second scenario, memory allocation and binding to shared pointer is an atomic (from the point of view of this expression).
+* Less allocations. Using shared_ptr constructor with new operator to create the smart pointer entails 2 memory allocations: one for object creation and one for control block of the shared pointer. On the other hand, make_shared unites these 2 into one allocation, thus decreasing program static size and increasing its speed.
+Now about the other side of the medal.
+* Make functions don't allow for custom deleters, while shared_ptr and unique_ptr constructors do.
+* Initialization from initializer list. By default all arguments are perferctly forwarded as-is, comma separated, braces enclosed. For initializer list the following must be done:
+```cpp
+auto initList = {1, 2, 3, 4, 5};
+auto spv = std::make_shared<std::vector<int>>(initList);
+```
+For `std::shared_ptr` there're 2 more dangerous scenarios.
+* For classes with cutsom new and delete operators, make verions of shared_ptr creation might fail because those functions request a memory chunk of objects' size + the size of control object. While most implementations of custom new/delete operators are only set to work properly with object's true size.
+* Moreover, huge objects, allocated with `std::make_shared` cannot free their memory untill all references to the control block are destroyed. And it includes not only shared_ptrs, but also all the weak_ptrs pointing to the control block.
+In case when make function is unavailable, and to avoid the pitfalls of potential leak when using new instead of make functions, the following approach is adviced.
+```cpp
+std::shared_ptr<Widget> spw(new Widget, customDeleter);
+processWidget(std::move(spw), computePriority());
+```
+This way, we avoid copying of shared_ptr through using move semantics and avoid exception-related memory leaks.
 
 
 
