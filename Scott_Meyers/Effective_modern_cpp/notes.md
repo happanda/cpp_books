@@ -917,6 +917,79 @@ processWidget(std::move(spw), computePriority());
 ```
 This way, we avoid copying of shared_ptr through using move semantics and avoid exception-related memory leaks.
 
+# Item 22. When using the Pimpl Idiom, define special member functions in the implementation file.
+Pimpl (pointer to implementation https://en.wikipedia.org/wiki/Opaque_pointer) idiom is widely used in C++. C++98 approach used raw pointer with new/delete allocation/deallocation. With smart pointers the best choice is to use `std::unique_ptr`. But placing it directly instead of raw pointer doesn't work:
+```cpp
+// widget.h
+class Widget
+{
+public:
+    Widget();
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// widget.cpp
+struct Widget::Impl
+{
+    // implementation
+};
+
+Widget::Widget()
+    : pImpl(std::make_unique<Impl>())
+{ }
+```
+The code compiles, but it's use doesn't. Declaration of Widget gives an error. Going out of scope requires the object to be destructed, thus it's destructor is called. There's no destructor in Widget, because there's nothing to put in it, hence the compiler generates a default one. Inside there's a default deleter, which calls `delete` statement preceded by a `static_assert` that checks that pointer is not of incomplete type. This destructor is usually inlined, that's why error line is that of object creation.
+To fix the problem, the definition of `Widget::Impl` should be known to compiler at the point of smart pointer destruction, at Widget's destructor.
+```cpp
+// widget.h
+class Widget
+{
+public:
+    Widget();
+    ~Widget(); // custom
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// widget.cpp
+struct Widget::Impl
+{
+    // implementation
+};
+
+Widget::Widget()
+    : pImpl(std::make_unique<Impl>())
+{ }
+
+Widget::~Widget()
+{ }
+// or rather it can be replaced by
+// Widget::~Widget() = default;
+```
+Note that declaring a destructor prevents auto creation of move constructor and operator, so you might want to define them, but to avoid same problem that was caused by missing destructor, declarations must go into cpp after `Widget::Impl`.
+As a bonus notice, `std::shared_ptr` if being used for PImpl idiom will not require explicit destructor declaration. The difference is due to these smart pointers different handling of deleters. `std::unique_ptr` has deleter incorporated into its type, while `std::shared_ptr` deleter is not part of its type.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
