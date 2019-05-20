@@ -1,5 +1,7 @@
 # Pattern Searching with Boyer-Moore algorithm
 
+[Original post](https://www.bfilipek.com/2018/08/searchers.html)
+
 C++17 allows pattern searching applying different algorithms.
 
 #### std::search
