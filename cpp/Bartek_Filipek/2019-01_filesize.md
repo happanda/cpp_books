@@ -28,3 +28,10 @@ if (ec == std::error_code{})
 else
 	/* error happened, check ec.message(), ec.value(), ec.category */
 ```
+
+#### `std::filesystem::file_size` advantages and differences
+
+[Original post](https://www.bfilipek.com/2019/01/filesizeadvantages.html)
+
+- Function from std allows to get file size even when there's no read permissions for the file, only for it's parent directory.
+- Also std function should be faster then any homemade solutions with read pointer maths or similar
